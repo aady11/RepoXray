@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from .models import GitInfo
 
@@ -27,8 +29,31 @@ def inspect_git_repository(path: Path) -> GitInfo:
         branch=branch,
         is_clean=status == "" if status is not None else None,
         commit_count=commit_count,
-        remote_url=remote_url,
+        remote_url=_sanitize_remote_url(remote_url) if remote_url else None,
     )
+
+
+def _sanitize_remote_url(remote_url: str) -> str:
+    """Remove URL user-info and query/fragment data before displaying a remote.
+
+    Git remotes can contain embedded passwords, access tokens, or signed query
+    parameters. Those values must not be copied into terminal or JSON reports.
+    """
+    if "://" in remote_url:
+        parsed = urlsplit(remote_url)
+        if parsed.scheme and parsed.netloc:
+            host = parsed.hostname or ""
+            if ":" in host and not host.startswith("["):
+                host = "[{0}]".format(host)
+            try:
+                port = parsed.port
+            except ValueError:
+                port = None
+            netloc = "{0}:{1}".format(host, port) if port is not None else host
+            return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+
+    # SCP-style Git remotes may also contain user-info, e.g. user:token@host:path.
+    return re.sub(r"^[^/@]+@", "", remote_url)
 
 
 def _git(path: Path, *args: str) -> Optional[str]:
