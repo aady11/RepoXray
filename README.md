@@ -38,7 +38,7 @@ Repo Health
 - Renders a deliberately bounded tree so a large repository does not overwhelm the terminal.
 - Highlights files at or above the large-file threshold (5 MiB by default).
 - Checks files locally for likely API keys, tokens, password assignments, private keys, and sensitive filenames without exposing detected values.
-- Reads local Git metadata when available: branch, working tree cleanliness, commit count, and `origin` remote URL.
+- Reads local Git metadata when available: branch, working tree cleanliness, commit count, and a sanitized `origin` remote URL.
 - Produces a transparent heuristic health score from 0 to 100.
 - Emits a complete JSON document for scripts, CI jobs, or other local automation.
 
@@ -236,6 +236,8 @@ git -C PATH rev-list --count HEAD
 git -C PATH config --get remote.origin.url
 ```
 
+The remote URL is sanitized before it appears in either the terminal report or JSON output: URL user-info (where credentials are often embedded), query parameters, and fragments are removed. SCP-style remotes also have their user-info removed. This prevents common credential-bearing remote formats from being copied into a report.
+
 It does not invoke `git add`, `git commit`, `git push`, or any other mutating Git operation. If Git is unavailable or the path is not a repository, scanning still works and the report states that Git metadata is unavailable.
 
 ## Health score
@@ -325,6 +327,7 @@ tests/
 ├── test_scanner.py   # scan counts, bytes, ignored directories
 ├── test_analyzer.py  # language detection percentages
 ├── test_secrets.py   # fake-secret detection and redaction behavior
+├── test_gitinfo.py   # Git remote credential redaction
 └── test_health.py    # transparent score calculation
 ```
 
